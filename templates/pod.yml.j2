@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: {{ service.name }}
+  name: {{ service.name }}
+spec:
+  containers:
+  - name: {{ service.db_container.name | default('db') }}
+    image: {{ service.db_container.image | default('quay.io/centos7/postgresql-12-centos7:latest') }}
+    args:
+      - run-postgresql
+    envFrom:
+      - configMapRef:
+          name: config
+    volumeMounts:
+      - mountPath: /var/lib/pgsql
+        name: pg-data
+    resources:
+      requests:
+        memory: "{{ service.db_container.resources.requests.memory | default('128Mi') }}"
+        cpu: "{{ service.db_container.resources.requests.cpu | default('250m') }}"
+      limits:
+        memory: "{{ service.db_container.resources.limits.memory | default('256Mi') }}"
+        cpu: "{{ service.db_container.resources.limits.cpu | default('500m') }}"
+  - name: {{ service.ui_container.name | default('ui') }}
+    image: {{ service.ui_container.image | default('quay.io/edge-infrastructure/assisted-installer-ui:latest') }}
+    ports:
+      - hostPort: 8080
+        containerPort: 8080
+    envFrom:
+      - configMapRef:
+          name: config
+    #volumeMounts:
+    #  - name: certs-configmap-volume
+    #    mountPath: /etc/certs
+    resources:
+      requests:
+        memory: "{{ service.ui_container.resources.requests.memory | default('128Mi') }}"
+        cpu: "{{ service.ui_container.resources.requests.cpu | default('250m') }}"
+      limits:
+        memory: "{{ service.ui_container.resources.limits.memory | default('256Mi') }}"
+        cpu: "{{ service.ui_container.resources.limits.cpu | default('500m') }}"
+  - name: {{ service.img_svc_container.name | default('image-service') }}
+    image: {{ service.img_svc_container.image | default('quay.io/edge-infrastructure/assisted-image-service:latest') }}
+    ports:
+      - hostPort: 8888
+        containerPort: 8888
+    envFrom:
+      - configMapRef:
+          name: config
+    #volumeMounts:
+    #  - name: certs-configmap-volume
+    #    mountPath: /etc/certs
+    resources:
+      requests:
+        memory: "{{ service.img_svc_container.resources.requests.memory | default('128Mi') }}"
+        cpu: "{{ service.img_svc_container.resources.requests.cpu | default('250m') }}"
+      limits:
+        memory: "{{ service.img_svc_container.resources.limits.memory | default('256Mi') }}"
+        cpu: "{{ service.img_svc_container.resources.limits.cpu | default('500m') }}"
+  - name: {{ service.api_svc_container.name | default('service') }}
+    image: {{ service.api_svc_container.image | default('quay.io/edge-infrastructure/assisted-service:latest') }}
+    ports:
+      - hostPort: 8090
+        containerPort: 8090
+    envFrom:
+      - configMapRef:
+          name: config
+    volumeMounts:
+      - mountPath: /data
+        name: ai-data
+      #- name: certs-configmap-volume
+      #  mountPath: /etc/certs
+    resources:
+      requests:
+        memory: "{{ service.api_svc_container.resources.requests.memory | default('128Mi') }}"
+        cpu: "{{ service.api_svc_container.resources.requests.cpu | default('250m') }}"
+      limits:
+        memory: "{{ service.api_svc_container.resources.limits.memory | default('256Mi') }}"
+        cpu: "{{ service.api_svc_container.resources.limits.cpu | default('500m') }}"
+  restartPolicy: Never
+  volumes:
+    - name: ai-data
+      persistentVolumeClaim:
+        claimName: ai-service-data
+    - name: pg-data
+      persistentVolumeClaim:
+        claimName: ai-db-data
+    #- name: certs-configmap-volume
+    #  configMap:
+    #    name: certs

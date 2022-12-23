@@ -1,0 +1,17 @@
+[Unit]
+Description={{ service.name }} Container
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStop={{ service_containers_dir }}/{{ service.name }}/scripts/servicectl.sh stop
+ExecStart={{ service_containers_dir }}/{{ service.name }}/scripts/servicectl.sh start
+ExecReload={{ service_containers_dir }}/{{ service.name }}/scripts/servicectl.sh restart
+
+TimeoutStartSec=300
+TimeoutSec=300
+Type=forking
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,67 @@
+---
+services:
+- name: lab-assisted-installer
+  config:
+    url: https://assisted-service.kemo.labs
+    img_svc_url: https://assisted-image-service.kemo.labs # defaults to http://127.0.0.1:8888
+    iso_type: full-iso # options are minimal-iso or full-iso
+    scheme: http # options are http(default) or https
+    auth_type: none # technically here but does nothing yet
+    #extra_data:
+    #  OTHER_ENV: data
+    #  OTHER_ENV2: data2
+
+  network:
+    name: lanBridge
+    ip: 192.168.42.18
+    # The following ports are the standard set that are exposed for OAS
+    ports:
+    - 8080/tcp # UI
+    - 8090/tcp # API
+    - 8888/tcp # Image Service
+
+  # The following container specifications are optional and the values below are the defaults normally set
+  # when not specified.
+  db_container:
+    name: lab-assisted-installer-db
+    image: quay.io/centos7/postgresql-12-centos7:latest
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+
+  ui_container:
+    name: lab-assisted-installer-ui
+    image: quay.io/edge-infrastructure/assisted-installer-ui:latest
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+
+  img_svc_container:
+    name: lab-assisted-installer-img-svc
+    image: quay.io/edge-infrastructure/assisted-image-service:latest
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+
+  api_svc_container:
+    name: lab-assisted-installer-api-svc
+    image: quay.io/edge-infrastructure/assisted-service:latest
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"

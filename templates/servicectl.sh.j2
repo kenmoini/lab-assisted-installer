@@ -1,0 +1,112 @@
+#!/bin/bash
+
+set -x
+
+###################################################################################
+# VARIABLES
+###################################################################################
+
+POD_NAME="{{ service.name }}"
+POD_NETWORK="--network {{ service.network.name | default('host') }}"
+
+{% if service.network.ports | length > 0 %}
+POD_PORTS="-p {{ service.network.ports | join(' -p ') }}"
+#POD_NETWORK="${POD_NETWORK} ${POD_PORTS}"
+{% endif %}
+
+{% if service.network.ip is defined %}
+POD_IP_ADDRESS="{{ service.network.ip }}"
+POD_NETWORK="${POD_NETWORK} --ip ${POD_IP_ADDRESS}"
+{% endif %}
+
+## Base ENVIRONMENTAL VARIABLES
+ENV_VARS="-e TZ={{ service.timezone | default(timezone) }}"
+
+API_CONTAINER_IMAGE="{{ service.api_svc_container.image | default('quay.io/edge-infrastructure/assisted-service:latest') }}"
+DB_CONTAINER_IMAGE="{{ service.db_container.image | default('quay.io/centos7/postgresql-12-centos7:latest') }}"
+IMG_SVC_CONTAINER_IMAGE="{{ service.img_svc_container.image | default('quay.io/edge-infrastructure/assisted-image-service:latest') }}"
+UI_CONTAINER_IMAGE="{{ service.ui_container.image | default('quay.io/edge-infrastructure/assisted-installer-ui:latest') }}"
+
+CONTAINER_IMAGES=(${API_CONTAINER_IMAGE} ${DB_CONTAINER_IMAGE} ${IMG_SVC_CONTAINER_IMAGE} ${UI_CONTAINER_IMAGE})
+
+###################################################################################
+# EXECUTION PREFLIGHT - Generic
+###################################################################################
+
+## Ensure there is an action arguement
+if [ -z "$1" ]; then
+  echo "Need action arguement of 'start', 'restart', 'stop', or 'update'!"
+  echo "${0} start|stop|restart|update"
+  exit 1
+fi
+
+################################################################################### SERVICE ACTION SWITCH
+case $1 in
+
+  ################################################################################# RESTART/STOP SERVICE - Generic, Play
+  "restart" | "stop" | "start")
+    echo "Stopping container services if running..."
+
+    echo "Killing ${POD_NAME} Podman Play..."
+    /usr/bin/podman play kube --down {{ service_containers_dir }}/${POD_NAME}/config/pod.yml | true
+
+    ;;
+
+  ################################################################################# UPDATE SERVICE - Image Specific
+  "update")
+    echo "Checking for container updates..."
+    CONTAINER_UPDATED="false"
+
+    # Loop through the container images and check for updates
+    for IMG in "${CONTAINER_IMAGES[@]}"; do
+      echo "Container Image:   ${IMG} ..."
+{% raw %}
+      # Get the current image SHA
+      CURRENT_IMAGE_SHA=$(podman images --digests --format '{{.Digest}}' ${IMG})
+      LATEST_IMAGE_SHA=$(skopeo inspect docker://${IMG} | jq -r '.Digest')
+{% endraw %}
+      # Compare the two strings, making sure they're not empty and begin wiht 'sha256:'
+      if [ ! -z "${LATEST_IMAGE_SHA}" ] && [ ! -z "${CURRENT_IMAGE_SHA}"  ] && [[ "${LATEST_IMAGE_SHA}" == sha256:* ]] && [[ "${CURRENT_IMAGE_SHA}" == sha256:* ]]; then
+        echo "Current image SHA: ${CURRENT_IMAGE_SHA}"
+        echo "Latest image SHA:  ${LATEST_IMAGE_SHA}"
+
+        # If the two strings are different then run the update scripts
+        if [ "${CURRENT_IMAGE_SHA}" != "${LATEST_IMAGE_SHA}" ]; then
+          echo "New image available, updating..."
+
+          # Pull the updated image
+          /usr/bin/podman pull ${IMG}
+          # Set the CONTAINER_UPDATED flag to true
+          CONTAINER_UPDATED="true"
+        else
+          echo "No new image available, continuing..."
+        fi
+      fi
+    done
+
+    # If the CONTAINER_UPDATED flag is true then restart the service
+    if [ "${CONTAINER_UPDATED}" == "true" ]; then
+      echo "New image pull detected - restarting service..."
+      ${0} restart
+    fi
+
+    ;;
+
+esac
+
+case $1 in
+
+  ################################################################################# RESTART/START SERVICE - CUSTOM
+  "restart" | "start")
+    sleep 3
+
+    echo "Starting container pod services..."
+
+    /usr/bin/podman play kube \
+      ${POD_NETWORK} \
+      --configmap {{ service_containers_dir }}/${POD_NAME}/config/configmap.yml \
+      {{ service_containers_dir }}/${POD_NAME}/config/pod.yml
+
+    ;;
+
+esac

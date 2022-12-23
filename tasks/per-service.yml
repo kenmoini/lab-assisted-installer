@@ -1,0 +1,76 @@
+---
+
+- name: Create CaaS Directories
+  ansible.builtin.file:
+    path: "{{ dir_item.path }}"
+    state: directory
+    owner: "{{ dir_item.owner | default('root') }}"
+    group: "{{ dir_item.group | default('root') }}"
+  loop:
+    - path: "{{ service_containers_dir }}/{{ service.name }}/"
+    - path: "{{ service_containers_dir }}/{{ service.name }}/scripts"
+    - path: "{{ service_containers_dir }}/{{ service.name }}/config"
+  loop_control:
+    loop_var: dir_item
+
+# - name: Set up additional trusted root certificates for NodeJS
+#   when: additionalTrustedRootCerts is defined
+#   block:
+#     - name: Create CaaS Directory for certs
+#       ansible.builtin.file:
+#         path: "{{ dir_item }}"
+#         state: directory
+#         owner: root
+#         group: root
+#       loop:
+#         - "{{ service_containers_dir }}/{{ service.name }}/"
+#         - "{{ service_containers_dir }}/{{ service.name }}/certs"
+#         - "{{ service_containers_dir }}/{{ service.name }}/certs/roots"
+#       loop_control:
+#         loop_var: dir_item
+
+#     - name: Download any additional trusted Root CA certs
+#       ansible.builtin.get_url:
+#         url: "{{ download_item }}"
+#         dest: "{{ service_containers_dir }}/{{ service.name }}/certs/roots/{{ download_item | basename }}"
+#         owner: root
+#         group: root
+#         mode: 0644
+#       loop: "{{ additionalTrustedRootCerts }}"
+#       loop_control:
+#         loop_var: download_item
+
+#     - name: Join all the certs into a single file
+#       ansible.builtin.shell: "cat {{ service_containers_dir }}/{{ service.name }}/certs/roots/* > {{ service_containers_dir }}/{{ service.name }}/certs/extra-ca-bundle.crt"
+
+- name: Template CaaS deployment files - servicectl.sh.j2
+  ansible.builtin.template:
+    src: servicectl.sh.j2
+    dest: "{{ service_containers_dir }}/{{ service.name }}/scripts/servicectl.sh"
+    owner: root
+    group: root
+    mode: 0755
+
+- name: "Template CaaS deployment files - {{ service.name }}.service"
+  ansible.builtin.template:
+    src: service.j2
+    dest: "/etc/systemd/system/{{ service.name }}.service"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: "Template CaaS deployment files - Pod YAML"
+  ansible.builtin.template:
+    src: pod.yml.j2
+    dest: "{{ service_containers_dir }}/{{ service.name }}/config/pod.yml"
+    owner: root
+    group: root
+    mode: 0740
+
+- name: "Template CaaS deployment files - ConfigMap YAML"
+  ansible.builtin.template:
+    src: configmap.yml.j2
+    dest: "{{ service_containers_dir }}/{{ service.name }}/config/configmap.yml"
+    owner: root
+    group: root
+    mode: 0740

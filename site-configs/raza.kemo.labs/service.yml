@@ -1,0 +1,14 @@
+---
+services:
+- name: lab-assisted-installer
+  config:
+    url: https://assisted-service.kemo.labs
+    img_svc_url: https://assisted-image-service.kemo.labs
+
+  network:
+    name: lanBridge
+    ip: 192.168.42.70
+    ports:
+    - 8080/tcp
+    - 8090/tcp
+    - 8888/tcp
