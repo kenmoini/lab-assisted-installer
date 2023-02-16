@@ -1,6 +1,7 @@
 ---
 services:
 - name: lab-assisted-installer
+
   config:
     url: https://assisted-service.kemo.labs
     img_svc_url: https://assisted-image-service.kemo.labs
