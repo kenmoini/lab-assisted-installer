@@ -79,7 +79,7 @@ spec:
       limits:
         memory: "{{ service.api_svc_container.resources.limits.memory | default('256Mi') }}"
         cpu: "{{ service.api_svc_container.resources.limits.cpu | default('500m') }}"
-  restartPolicy: Never
+  restartPolicy: OnFailure
   volumes:
     - name: ai-data
       persistentVolumeClaim:
