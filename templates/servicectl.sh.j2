@@ -7,7 +7,8 @@ set -x
 ###################################################################################
 
 POD_NAME="{{ service.name }}"
-POD_NETWORK="--network {{ service.network.name | default('host') }}"
+POD_NETWORK_NAME="{{ service.network.name | default('host') }}"
+POD_NETWORK="--network ${POD_NETWORK_NAME}"
 
 {% if service.network.ports | length > 0 %}
 POD_PORTS="-p {{ service.network.ports | join(' -p ') }}"
@@ -39,6 +40,14 @@ if [ -z "$1" ]; then
   echo "${0} start|stop|restart|update"
   exit 1
 fi
+
+# Make sure there is no IP lock file
+echo "Checking for stale network lock file..."
+FILE_CHECK="/var/lib/cni/networks/${POD_NETWORK_NAME}/${POD_IP_ADDRESS}"
+if [[ -f "$FILE_CHECK" ]]; then
+    rm $FILE_CHECK
+fi
+
 
 ################################################################################### SERVICE ACTION SWITCH
 case $1 in
